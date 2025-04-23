@@ -16,31 +16,78 @@ float b2;
 float y_gain;
 float y_xoffset;
 
-int IR, umurr, HR, GLU, CHOL;
-float ACD;
+int IR, umurr, HR;
+float GLU, CHOL, ACD;  
 
 uint8_t roundUpToUint8(float value);
 float roundToOneDecimal(float value);
 float myNeuralNetworkFunction(const Eigen::Vector3f& input, int network_id);
+void processInputAndCalculate(int inputIR, int inputUmur, int inputHR);
 
 void setup() {
-    IR = 10000;
-    umurr = 30;
-    HR = 75;
-
-    Eigen::Vector3f inputData;
-    inputData << IR, umurr, HR;
-    GLU = roundUpToUint8(myNeuralNetworkFunction(inputData, 1));
-    CHOL = roundUpToUint8(myNeuralNetworkFunction(inputData, 2));
-    ACD = roundToOneDecimal(myNeuralNetworkFunction(inputData, 3));
-
-    Serial.begin(9600);
-    Serial.print("GLU: "); Serial.println(GLU);
-    Serial.print("CHOL: "); Serial.println(CHOL);
-    Serial.print("ACD: "); Serial.println(ACD);
+    Serial.begin(115200);  
+    Serial.println("Masukkan nilai IR, umurr, dan HR dipisahkan koma (contoh: 90947,44,69)");
+    Serial.println("Menunggu input...");
 }
 
 void loop() {
+    if (Serial.available() > 0) {
+        String inputString = Serial.readStringUntil('\n');
+        inputString.trim(); 
+
+        int firstCommaIndex = inputString.indexOf(',');
+        int secondCommaIndex = inputString.indexOf(',', firstCommaIndex + 1);
+
+        if (firstCommaIndex != -1 && secondCommaIndex != -1) {
+            String irString = inputString.substring(0, firstCommaIndex);
+            String umurrString = inputString.substring(firstCommaIndex + 1, secondCommaIndex);
+            String hrString = inputString.substring(secondCommaIndex + 1);
+
+            int inputIR = irString.toInt();
+            int inputUmur = umurrString.toInt();
+            int inputHR = hrString.toInt();
+
+            if ((inputIR != 0 || irString == "0") && (inputUmur != 0 || umurrString == "0") && (inputHR != 0 || hrString == "0") &&
+                irString.length() > 0 && umurrString.length() > 0 && hrString.length() > 0) {
+                processInputAndCalculate(inputIR, inputUmur, inputHR);
+                Serial.println("\nMasukkan nilai baru (IR,umurr,HR):");
+            } else {
+                Serial.println("Format input salah. Gunakan format IR,umurr,HR (contoh: 10000,30,75)");
+            }
+        } else {
+            Serial.println("Format input salah. Gunakan format IR,umurr,HR (contoh: 10000,30,75)");
+        }
+    }
+    delay(10);
+}
+
+void processInputAndCalculate(int inputIR, int inputUmur, int inputHR) {
+    IR = inputIR;
+    umurr = inputUmur;
+    HR = inputHR;
+
+    Eigen::Vector3f inputData;
+    inputData << static_cast<float>(IR), static_cast<float>(umurr), static_cast<float>(HR); // Cast to float
+
+    GLU = myNeuralNetworkFunction(inputData, 1);
+    ACD = myNeuralNetworkFunction(inputData, 2);
+    CHOL = myNeuralNetworkFunction(inputData, 3);
+
+    Serial.print("\nInput yang diterima: IR="); Serial.print(IR);
+    Serial.print(", Umur="); Serial.print(umurr);
+    Serial.print(", HR="); Serial.println(HR);
+
+    Serial.print("GLU (raw): "); Serial.println(GLU);
+    Serial.print("CHOL (raw): "); Serial.println(CHOL);
+    Serial.print("ACD (raw): "); Serial.println(ACD);
+
+    uint8_t glu_uint8 = roundUpToUint8(GLU);
+    uint8_t chol_uint8 = roundUpToUint8(CHOL);
+    float acd_rounded = roundToOneDecimal(ACD);
+
+    Serial.print("GLU (rounded up uint8): "); Serial.println(glu_uint8);
+    Serial.print("CHOL (rounded up uint8): "); Serial.println(chol_uint8);
+    Serial.print("ACD (rounded one decimal): "); Serial.println(acd_rounded);
 }
 
 uint8_t roundUpToUint8(float value) {
