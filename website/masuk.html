@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Masuk</title>
+        <script type="module" src="./config-sdk.js"></script>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+    
+            body {
+                background-color: #f5f7fa;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }
+    
+            .login-container, .signup-container {
+                background-color: #fff;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                text-align: center;
+                width: 100%;
+                max-width: 400px;
+            }
+    
+            h2 {
+                margin-bottom: 20px;
+                color: #2c3e50;
+            }
+    
+            input {
+                width: 100%;
+                padding: 10px;
+                margin: 10px 0;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                font-size: 16px;
+            }
+    
+            input:focus {
+                outline: none;
+                border-color: #3498db;
+                box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+            }
+    
+            button {
+                width: 100%;
+                padding: 10px;
+                background-color: #3498db;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                transition: background-color 0.3s;
+            }
+    
+            button:hover {
+                background-color: #2980b9;
+            }
+    
+            p {
+                margin-top: 15px;
+            }
+    
+            a {
+                color: #3498db;
+                text-decoration: none;
+            }
+    
+            a:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </head>    
+<body>
+
+    <div class="login-container">
+        <h2>Login</h2>
+        <form id="loginForm">
+            <input type="email" id="email" placeholder="Email" required><br>
+            <input type="password" id="password" placeholder="Password" required><br>
+            <button type="submit">Masuk</button>
+        </form>
+        <p>Belum punya akun? <a href="daftar.html">Daftar</a></p>
+    </div>
+
+    <script type="module">
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+        import { app } from "./config-sdk.js";
+    
+        const db = getDatabase(app);
+        const loginForm = document.getElementById('loginForm');
+    
+        // Cek apakah pengguna sudah login sebelumnya
+        if (localStorage.getItem('isLoggedIn') === 'true') {
+            window.location.href = 'index.html';
+        }
+    
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+    
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+    
+            const emailKey = email.replace(/[.#$[\]]/g, '_');
+            const userRef = ref(db, `users/${emailKey}`);
+    
+            onValue(userRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const userData = snapshot.val();
+                    if (userData.password === password) {
+                        localStorage.setItem('isLoggedIn', 'true');
+                        localStorage.setItem('username', userData.username);
+                        localStorage.setItem('idmicro', userData.idmicro);
+    
+                        // Mencegah pengguna kembali ke halaman login
+                        history.pushState(null, null, window.location.href);
+                        window.location.href = 'index.html';
+                    } else {
+                        alert('Password salah.');
+                    }
+                } else {
+                    alert('User tidak ditemukan.');
+                }
+            }, {
+                onlyOnce: true
+            });
+        });
+    
+        // Cegah kembali ke halaman masuk dengan tombol "Back"
+        window.addEventListener('popstate', function () {
+            history.pushState(null, null, window.location.href);
+        });
+    
+    </script>    
+    
+</body>
+</html>
