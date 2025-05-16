@@ -10,8 +10,9 @@
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <ArduinoJson.h>
-
-using namespace Eigen;
+#include <Firebase_ESP_Client.h>
+#include "addons/TokenHelper.h"
+#include "addons/RTDBHelper.h"
 
 #define btn1_pin 5   
 #define btn2_pin 13  
@@ -21,6 +22,8 @@ using namespace Eigen;
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET 4
+#define API_KEY "AIzaSyDX9FQQai2rWeUubCX903z-yPMro_TGTIQ"
+#define DATABASE_URL "https://projectv1-a9190-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 enum MenuState {
   MAIN_MENU,
@@ -39,6 +42,18 @@ enum MenuState {
   WIFI_TURNING_OFF, 
   WIFI_TURNING_ON   
 };
+
+FirebaseAuth auth;
+FirebaseData fbdo;
+FirebaseConfig config;
+using namespace Eigen;
+
+String idPath = "/deviceID";
+String gluPath = "/glucose";
+String uridPath = "/urid";
+String agePath = "/age";
+String pHPath = "/pH";
+String timePath = "/timestamp";
 
 MenuState currentState = MAIN_MENU;
 int currentMenuItem = 0;
@@ -101,6 +116,9 @@ void createDir(fs::FS &fs, const char *path);
 String getTimestamp();
 void checkAndRestoreWiFi();
 void turnOffWiFiForMeasurement();
+void deleteFile(fs::FS &fs, const char *path);
+void setupFirebase();
+void sendDataToFirebase();
 
 void setup() {
   Serial.begin(115200);
@@ -824,39 +842,94 @@ void showDataTransfer() {
   display.setTextSize(1);
   display.setCursor(0, 0);
   display.print("=== Data Transfer ===");  
+  static uint8_t step = 0;
+  static unsigned long lastActionTime = 0;
+  static bool transferSuccess = false;
+  static unsigned long finishTime = 0; 
   if (!wifiConfigured) { 
     display.setCursor(0, 15);
-    display.print("WiFi not connected or");
+    display.print("WiFi not connected!");
     display.setCursor(0, 25);
-    display.print("not configured.");
-  } else if (!transferInProgress) {
+    display.print("Config WiFi first.");
+    display.setCursor(0, 55);
+    display.print("Btn2: Back to Menu");
+    display.display();
+    step = 0;
+    transferInProgress = false;
+    return;
+  }
+  if (!transferInProgress) {
+    step = 0;
+    transferProgress = 0;
     display.setCursor(0, 20);
     display.print("Ready to transfer.");
     display.setCursor(0, 30);
     display.print("Press Btn1 to start.");
-  } else {
-    transferProgress += 5; 
-    if (transferProgress > 100) {
-      transferProgress = 100; 
-      display.setCursor(0, 20);
-      display.print("Transfer complete!");
-      display.setCursor(0, 40);
-      display.print("Press Btn1 for Menu."); 
-    } else {
-      display.setCursor(0, 20);
-      display.print("Transferring: ");
+    display.setCursor(0, 55);
+    display.print("Btn2: Back to Menu");
+    display.display();
+    return;
+  }
+  switch(step) {
+    case 0: 
+      display.setCursor(0, 15);
+      display.print("Init Firebase...");
+      display.display();
+      setupFirebase();
+      delay(500);
+      step = 1;
+      lastActionTime = millis();
+      break;
+    case 1: 
+      display.setCursor(0, 15);
+      display.print("Preparing data...");
+      display.display();
+      if (millis() - lastActionTime > 600) {
+        step = 2;
+        transferProgress = 0;
+      }
+      break;
+    case 2: 
+      display.setCursor(0, 15);
+      display.print("Sending to server");
+      display.setCursor(0, 25);
+      display.print("Progress: ");
       display.print(transferProgress);
       display.print("%");
-      display.drawRect(10, 30, 108, 10, SSD1306_WHITE);
-      display.fillRect(11, 31, (int)(transferProgress * 1.06f), 8, SSD1306_WHITE); 
-      display.setCursor(0, 45);
-      display.print("Press Btn1 to Cancel");
-      delay(100);
-    }
+      display.drawRect(10, 38, 108, 10, SSD1306_WHITE);
+      display.fillRect(11, 39, (int)(transferProgress * 1.06f), 8, SSD1306_WHITE);
+      display.display();
+      sendDataToFirebase();
+      delay(600);
+      if (transferProgress < 100) {
+        transferProgress += 34; 
+        if (transferProgress >= 100) {
+          transferProgress = 100;
+          step = 3;
+        }
+      }
+      break;
+    case 3: 
+      transferSuccess = true; 
+      display.setCursor(0, 15);
+      if (transferSuccess) {
+        display.print("Transfer Complete!");
+      } else {
+        display.print("Transfer Failed!");
+      }
+      display.display();
+      if (finishTime == 0) {
+        finishTime = millis();
+      }
+      if (millis() - finishTime > 2000) { 
+        finishTime = 0; 
+        transferInProgress = false;
+        step = 0;
+        currentState = MAIN_MENU;
+        showMainMenu();
+      }
+      break;
   }
-  display.setCursor(0, 55); 
-  display.print("Btn2: Back to Menu");
-  display.display();
 }
 
 uint8_t roundUpToUint8(float value) {
@@ -945,23 +1018,25 @@ float myNeuralNetworkFunction(const Eigen::Vector2f& input, int network_id) {
 
 void saveSelectedDataToJson(float GLU, float ACD, int age, float finalAvgPH, int deviceIDs, String timestamp11) {
   File file = LittleFS.open(var2Path, FILE_READ);
-  DynamicJsonDocument doc(1024);
+  DynamicJsonDocument doc(2048);
   if (file) {
     DeserializationError error = deserializeJson(doc, file);
     if (error) {
-      doc["results"] = JsonArray();
+      doc["sensor"] = JsonObject();
     }
     file.close();
   } else {
-    doc["results"] = JsonArray();
+    doc["sensor"] = JsonObject();
   }
-  JsonObject data = doc["results"].createNestedObject();
-  data["timestamp"] = timestamp11;
+  JsonObject sensorData = doc["sensor"].to<JsonObject>();
+  JsonObject data = sensorData.createNestedObject(timestamp11);  
+  data["timestamp"] = timestamp11;                              
   data["glucose"] = GLU;
   data["uric_acid"] = ACD;
   data["age"] = age;
   data["avg_ph"] = finalAvgPH;
   data["devicesID"] = deviceIDs;
+  
   file = LittleFS.open(var2Path, FILE_WRITE);
   if (!file) {
     Serial.println("Gagal membuka file untuk menulis.");
@@ -973,10 +1048,19 @@ void saveSelectedDataToJson(float GLU, float ACD, int age, float finalAvgPH, int
 }
 
 String getTimestamp() {
-  timeClient.update();
+  timeClient.update(); 
   unsigned long epochTime = timeClient.getEpochTime();
-  struct tm *ptm = gmtime((time_t *)&epochTime);
-  char buffer[26];
+  if (epochTime < 1577836800UL) {
+    Serial.println("[ERROR] NTP belum sinkron! epoch: " + String(epochTime) + ". Mengembalikan default timestamp.");
+    return "1970-01-01T00:00:00+07:00"; 
+  }
+  time_t epoch_for_gmtime = epochTime; 
+  struct tm *ptm = gmtime(&epoch_for_gmtime);
+  if (!ptm) {
+    Serial.println("[ERROR] gmtime gagal mengkonversi epoch: " + String(epoch_for_gmtime));
+    return "0000-00-00T00:00:00+07:00"; 
+  }
+  char buffer[26];  
   snprintf(buffer, sizeof(buffer), "%04d-%02d-%02dT%02d:%02d:%02d+07:00",
            ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday,
            ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
@@ -1002,3 +1086,68 @@ void createDir(fs::FS &fs, const char *path) {
 
 //------------------
 
+void setupFirebase() {
+  config.api_key = API_KEY;
+  config.database_url = DATABASE_URL;
+
+  if (Firebase.signUp(&config, &auth, "", "")) {
+    Firebase.reconnectWiFi(true);
+  } else {
+  }
+
+  config.token_status_callback = tokenStatusCallback;
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+}
+
+void deleteFile(fs::FS &fs, const char *path) {
+  fs.remove(path);
+}
+
+void sendDataToFirebase() {
+  if (!Firebase.ready()) {
+    return;
+  }
+
+  File file = LittleFS.open(var2Path, FILE_READ);
+  if (!file) {
+    return;
+  }
+
+  DynamicJsonDocument doc(2048);
+  DeserializationError error = deserializeJson(doc, file);
+  file.close();
+
+  if (error) {
+    return;
+  }
+
+  JsonObject sensorData = doc["sensor"];
+  bool allDataSent = true;
+
+  for (JsonPair kv : sensorData) {
+    String timestamp = kv.key().c_str();  
+    JsonObject data = kv.value();
+    FirebaseJson json;
+    json.set(idPath.c_str(), data["devicesID"].as<String>());
+    json.set(gluPath.c_str(), data["glucose"].as<String>());
+    json.set(uridPath.c_str(), data["uric_acid"].as<String>());
+    json.set(pHPath.c_str(), data["avg_ph"].as<String>());
+    json.set(agePath.c_str(), data["age"].as<String>());
+    json.set(timePath.c_str(), data["timestamp"].as<String>()); 
+
+    String databasePath = "/sensor";
+    String parentPath = databasePath + "/" + timestamp;
+
+    if (Firebase.RTDB.setJSON(&fbdo, parentPath.c_str(), &json)) {
+      Serial.println("Data JSON berhasil dikirim di firebase");
+    } else {
+      allDataSent = false;
+    }
+  }
+
+  if (allDataSent) {
+    deleteFile(LittleFS, var2Path);
+    Serial.print("Data JSON telah dihapus dari memori flash");
+  }
+}
