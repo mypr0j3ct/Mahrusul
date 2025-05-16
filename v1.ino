@@ -941,6 +941,8 @@ float myNeuralNetworkFunction(const Eigen::Vector2f& input, int network_id) {
     return y1_output_func;
 }
 
+//Kode Berkaitan Save DataJSON
+
 void saveSelectedDataToJson(float GLU, float ACD, int age, float finalAvgPH, int deviceIDs, String timestamp11) {
   File file = LittleFS.open(var2Path, FILE_READ);
   DynamicJsonDocument doc(1024);
@@ -997,3 +999,6 @@ String readFile2(fs::FS &fs, const char *path) {
 void createDir(fs::FS &fs, const char *path) {
   fs.mkdir(path);
 }
+
+//------------------
+
