@@ -7,6 +7,9 @@
 #include <LittleFS.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>
+#include <ArduinoJson.h>
 
 using namespace Eigen;
 
@@ -66,16 +69,22 @@ bool wifiConfigured = false;
 bool wifiCredentialsExist = false; 
 const char* ssidPath = "/ssid.txt";
 const char* passPath = "/pass.txt";
+const char* var2Path = "/data/value.txt";
 AsyncWebServer server(80);
 bool transferInProgress = false;
 int transferProgress = 0;
 float temperature = 25.0;
 float GLU, ACD;
+String timestamp1;
+String storedData;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 DFRobot_ESP_PH ph;
 bool wifiWasActiveBeforeMeasurement = false;
 WiFiMode_t previousWiFiMode = WIFI_OFF; 
 bool attemptingReconnectAfterMeasurement = false;
+const long utcOffsetInSeconds = 7 * 3600;  
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 
 void startWiFiAPMode();
 void attemptWiFiConnection();
@@ -83,9 +92,13 @@ String readFile(fs::FS &fs, const char *path);
 void writeFile(fs::FS &fs, const char *path, const char *message);
 void showWiFiAPScreen();
 void showWiFiConnectingScreen(const String& targetSsid, bool isConnecting, const String& message = "");
+void saveSelectedDataToJson(float GLU, float ACD, int age, float finalAvgPH, int deviceIDs, String timestamp11);
 float myNeuralNetworkFunction(const Eigen::Vector2f& input, int network_id);
 uint8_t roundUpToUint8(float value);
 float roundToOneDecimal(float value);
+String readFile2(fs::FS &fs, const char *path);
+void createDir(fs::FS &fs, const char *path);
+String getTimestamp();
 void checkAndRestoreWiFi();
 void turnOffWiFiForMeasurement();
 
@@ -126,10 +139,10 @@ void loop() {
     case MEASUREMENT: 
       turnOffWiFiForMeasurement(); 
       if (currentState == MEASUREMENT) { 
-          currentState = AGE_INPUT_TENS;
-          showAgeInputTens();
+        currentState = AGE_INPUT_TENS;
+        showAgeInputTens();
       }
-      break;  
+      break;
     case WIFI_TURNING_OFF:
       break;
     case AGE_INPUT_TENS:
@@ -172,6 +185,10 @@ void loop() {
 }
 
 void turnOffWiFiForMeasurement() {
+    timestamp1 = getTimestamp();
+    storedData = readFile2(LittleFS, var2Path);
+    Serial.println(storedData);
+    delay(300);
     previousWiFiMode = WiFi.getMode(); 
     if (previousWiFiMode != WIFI_OFF) {
         wifiWasActiveBeforeMeasurement = true; 
@@ -337,6 +354,8 @@ void showGLUMON() {
     currentState = MAIN_MENU;
     showMainMenu();
   }
+  timeClient.begin();
+  createDir(LittleFS, "/data");
 }
 
 void showMainMenu() {
@@ -796,6 +815,8 @@ void showResults() {
   display.setCursor(0, 55);
   display.print("Btn1/2: To Menu (WiFi On)"); 
   display.display();
+  saveSelectedDataToJson(GLU, ACD, age, finalAvgPH, deviceID, timestamp1);
+  delay(500);
 }
 
 void showDataTransfer() { 
@@ -918,4 +939,61 @@ float myNeuralNetworkFunction(const Eigen::Vector2f& input, int network_id) {
             return -1.0f; 
     }
     return y1_output_func;
+}
+
+void saveSelectedDataToJson(float GLU, float ACD, int age, float finalAvgPH, int deviceIDs, String timestamp11) {
+  File file = LittleFS.open(var2Path, FILE_READ);
+  DynamicJsonDocument doc(1024);
+  if (file) {
+    DeserializationError error = deserializeJson(doc, file);
+    if (error) {
+      doc["results"] = JsonArray();
+    }
+    file.close();
+  } else {
+    doc["results"] = JsonArray();
+  }
+  JsonObject data = doc["results"].createNestedObject();
+  data["timestamp"] = timestamp11;
+  data["glucose"] = GLU;
+  data["uric_acid"] = ACD;
+  data["age"] = age;
+  data["avg_ph"] = finalAvgPH;
+  data["devicesID"] = deviceIDs;
+  file = LittleFS.open(var2Path, FILE_WRITE);
+  if (!file) {
+    Serial.println("Gagal membuka file untuk menulis.");
+    return;
+  }
+  serializeJson(doc, file);
+  file.close();
+  Serial.println("Data (GLU, ACD, age, finalAvgPH) berhasil disimpan ke file JSON di LittleFS");
+}
+
+String getTimestamp() {
+  timeClient.update();
+  unsigned long epochTime = timeClient.getEpochTime();
+  struct tm *ptm = gmtime((time_t *)&epochTime);
+  char buffer[26];
+  snprintf(buffer, sizeof(buffer), "%04d-%02d-%02dT%02d:%02d:%02d+07:00",
+           ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday,
+           ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
+  return String(buffer);
+}
+
+String readFile2(fs::FS &fs, const char *path) {
+  File file = fs.open(path, FILE_READ);
+  if (!file) {
+    return String();
+  }
+  String fileContent;
+  while (file.available()) {
+    fileContent += file.readString();
+  }
+  file.close();
+  return fileContent;
+}
+
+void createDir(fs::FS &fs, const char *path) {
+  fs.mkdir(path);
 }
