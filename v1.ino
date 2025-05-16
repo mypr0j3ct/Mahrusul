@@ -753,10 +753,8 @@ void calculateANNValues() {
 
   Eigen::Vector2f inputData;
   inputData << age, finalPH;
-
   GLU = myNeuralNetworkFunction(inputData, 1);
   ACD = myNeuralNetworkFunction(inputData, 2);
-
   GLU = roundUpToUint8(GLU);
   ACD = roundToOneDecimal(ACD);
 
