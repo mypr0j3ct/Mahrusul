@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLUMON - Akun</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-database-compat.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }   
+        body {
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        } 
+        .container {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+        .auth-card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #555;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            color: #4285F4;
+            border-bottom: 2px solid #4285F4;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border 0.3s;
+        }
+        .form-group input:focus {
+            border-color: #4285F4;
+            outline: none;
+        } 
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #3367d6;
+        }
+        .social-login {
+            margin-top: 25px;
+        }  
+        .social-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+            margin-bottom: 12px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .social-btn:hover {
+            background-color: #f5f5f5;
+        }  
+        .social-btn img {
+            width: 20px;
+            margin-right: 10px;
+        }
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 25px 0;
+            color: #777;
+        } 
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background-color: #ddd;
+        }
+        .divider span {
+            padding: 0 15px;
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #555;
+        }
+        .auth-footer a {
+            color: #4285F4;
+            text-decoration: none;
+        }
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+        .error-message {
+            color: #d32f2f; 
+            font-size: 14px;
+            margin-top: 5px;
+            display: none; 
+        }
+        .success-message {
+            background-color: #4caf50;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none; 
+        }
+        #userInfo {
+            display: none; 
+            text-align: center;
+            margin-top: 20px;
+        }
+        #userInfo img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin-bottom: 15px;
+            object-fit: cover;
+            background-color: #eee;
+        }
+        #loginForm, #registerForm {
+            display: none; 
+        }
+        #loginForm.active, #registerForm.active {
+            display: block;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4285F4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-message" id="successMessage"></div>
+        <div class="auth-card" id="authCard">
+            <h1>WELCOME</h1>
+            <div class="tabs">
+                <div class="tab active" id="loginTab">Masuk</div>
+                <div class="tab" id="registerTab">Daftar</div>
+            </div>
+            <form id="loginForm" class="active">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" placeholder="Masukkan email Anda" required>
+                    <div class="error-message" id="loginEmailError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Kata Sandi</label>
+                    <input type="password" id="loginPassword" placeholder="Masukkan kata sandi" required>
+                    <div class="error-message" id="loginPasswordError"></div>
+                </div>    
+                <button type="submit" class="btn">Masuk</button>
+                <div class="auth-footer">
+                    <p>Lupa kata sandi? <a href="#" id="forgotPassword">Reset</a></p>
+                </div>
+            </form>
+            <form id="registerForm"> 
+                <div class="form-group">
+                    <label for="registerName">Nama Lengkap</label>
+                    <input type="text" id="registerName" placeholder="Masukkan nama lengkap" required>
+                    <div class="error-message" id="registerNameError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="registerAge">Umur</label>
+                    <input type="number" id="registerAge" placeholder="Masukkan umur Anda" required min="1">
+                    <div class="error-message" id="registerAgeError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="registerMcuId">ID Mikrokontroler</label>
+                    <input type="text" id="registerMcuId" placeholder="Masukkan ID Mikrokontroler (0-999)" required>
+                    <div class="error-message" id="registerMcuIdError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" placeholder="Masukkan email Anda" required>
+                    <div class="error-message" id="registerEmailError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Kata Sandi</label>
+                    <input type="password" id="registerPassword" placeholder="Minimal 6 karakter" required>
+                    <div class="error-message" id="registerPasswordError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="registerConfirmPassword">Konfirmasi Kata Sandi</label>
+                    <input type="password" id="registerConfirmPassword" placeholder="Masukkan ulang kata sandi" required>
+                    <div class="error-message" id="registerConfirmPasswordError"></div>
+                </div>
+                <button type="submit" class="btn">Daftar</button>
+            </form>
+        </div>        
+        <div class="auth-card" id="userInfo"> 
+            <img src="/api/placeholder/100/100" alt="User Avatar" id="userAvatar">
+            <h2 id="userName">Nama Pengguna</h2>
+            <p id="userEmail">email@pengguna.com</p>
+            <button class="btn" id="logoutBtn" style="margin-top: 20px;">Keluar</button>
+        </div>
+    </div>
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module">
+        import { app, db } from './firebase-config.js'; 
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginTab = document.getElementById('loginTab');
+            const registerTab = document.getElementById('registerTab');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const authCard = document.getElementById('authCard');
+            const userInfoDiv = document.getElementById('userInfo');
+            const userNameDisplay = document.getElementById('userName');
+            const userEmailDisplay = document.getElementById('userEmail');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const successMessageDiv = document.getElementById('successMessage');
+            const loginEmailInput = document.getElementById('loginEmail');
+            const loginPasswordInput = document.getElementById('loginPassword');
+            const registerNameInput = document.getElementById('registerName');
+            const registerAgeInput = document.getElementById('registerAge');
+            const registerMcuIdInput = document.getElementById('registerMcuId');
+            const registerEmailInput = document.getElementById('registerEmail');
+            const registerPasswordInput = document.getElementById('registerPassword');
+            const registerConfirmPasswordInput = document.getElementById('registerConfirmPassword');
+            const loginEmailError = document.getElementById('loginEmailError');
+            const loginPasswordError = document.getElementById('loginPasswordError');
+            const registerNameError = document.getElementById('registerNameError');
+            const registerAgeError = document.getElementById('registerAgeError');
+            const registerMcuIdError = document.getElementById('registerMcuIdError');
+            const registerEmailError = document.getElementById('registerEmailError');
+            const registerPasswordError = document.getElementById('registerPasswordError');
+            const registerConfirmPasswordError = document.getElementById('registerConfirmPasswordError');
+            const forgotPasswordLink = document.getElementById('forgotPassword');
+            function showError(element, message) {
+                element.textContent = message;
+                element.style.display = 'block';
+            }
+            function clearError(element) {
+                element.textContent = '';
+                element.style.display = 'none';
+            }
+            function clearAllErrors() {
+                [loginEmailError, loginPasswordError, registerNameError, registerAgeError,
+                 registerMcuIdError, registerEmailError, registerPasswordError, registerConfirmPasswordError]
+                .forEach(clearError);
+            }
+            function validateAndFormatIdMicro(idmicro) {
+                if (!/^\d+$/.test(idmicro)) {
+                    return { valid: false, message: 'ID Mikrokontroler harus berupa angka.' };
+                }
+                const idNumber = parseInt(idmicro, 10);
+                if (idNumber < 0 || idNumber > 999) {
+                    return { valid: false, message: 'ID Mikrokontroler harus antara 0 dan 999.' };
+                }
+                const formattedId = idNumber.toString().padStart(3, '0');
+                return { valid: true, formattedId: formattedId };
+            }
+            loginTab.addEventListener('click', () => {
+                loginTab.classList.add('active');
+                registerTab.classList.remove('active');
+                loginForm.classList.add('active');
+                registerForm.classList.remove('active');
+                registerForm.style.display = 'none';
+                loginForm.style.display = 'block';
+                successMessageDiv.style.display = 'none';
+                clearAllErrors();
+            });
+            registerTab.addEventListener('click', () => {
+                registerTab.classList.add('active');
+                loginTab.classList.remove('active');
+                registerForm.classList.add('active');
+                loginForm.classList.remove('active');
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+                successMessageDiv.style.display = 'none';
+                clearAllErrors();
+            });
+            loginTab.click();
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                clearAllErrors();
+                const email = loginEmailInput.value.trim();
+                const password = loginPasswordInput.value;
+                if (!email) { showError(loginEmailError, "Email tidak boleh kosong."); return; }
+                if (!password) { showError(loginPasswordError, "Kata sandi tidak boleh kosong."); return; }
+                const emailKey = email.replace(/[.#$[\]]/g, '_');
+                const userNodeRef = db.ref(`users/${emailKey}`); 
+                userNodeRef.get().then((snapshot) => {
+                    if (snapshot.exists()) {
+                        const userData = snapshot.val();
+                        if (userData.password === password) { 
+                            localStorage.setItem('isLoggedIn', 'true');
+                            localStorage.setItem('userName', userData.namaLengkap || userData.username || "Pengguna"); 
+                            localStorage.setItem('userEmail', userData.email);
+                            if (userData.idmicro) {
+                                localStorage.setItem('idMicro', userData.idmicro);
+                            } else {
+                                localStorage.removeItem('idMicro');
+                            }
+                            window.location.href = 'index.html';
+                        } else {
+                            showError(loginPasswordError, 'Kata sandi salah.');
+                        }
+                    } else {
+                        showError(loginEmailError, 'Email tidak ditemukan.');
+                    }
+                }).catch((error) => {
+                    console.error("Error saat login:", error);
+                    showError(loginEmailError, "Gagal mengambil data pengguna. Periksa koneksi atau konfigurasi Firebase.");
+                });
+            });
+            async function isIdMicroRegistered(idmicro) {
+                const usersNodeRef = db.ref('users');
+                try {
+                    const snapshot = await usersNodeRef.get();
+                    if (snapshot.exists()) {
+                        const users = snapshot.val();
+                        for (const userKey in users) {
+                            if (users[userKey].idmicro === idmicro) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                } catch (error) {
+                    console.error("Error saat memeriksa ID Mikrokontroler:", error);
+                    showError(registerMcuIdError, "Terjadi kesalahan saat memeriksa ID. Coba lagi.");
+                    throw error; 
+                }
+            }
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearAllErrors();
+                successMessageDiv.style.display = 'none';
+                const name = registerNameInput.value.trim();
+                const age = registerAgeInput.value.trim();
+                const rawMcuId = registerMcuIdInput.value.trim();
+                const email = registerEmailInput.value.trim().toLowerCase();
+                const password = registerPasswordInput.value;
+                const confirmPassword = registerConfirmPasswordInput.value;
+                let hasError = false;
+                if (!name) { showError(registerNameError, "Nama lengkap tidak boleh kosong."); hasError = true; }
+                if (!age) { showError(registerAgeError, "Umur tidak boleh kosong."); hasError = true; }
+                else if (isNaN(parseInt(age)) || parseInt(age) <= 0) { showError(registerAgeError, "Umur tidak valid."); hasError = true; }
+                if (!rawMcuId) { showError(registerMcuIdError, "ID Mikrokontroler tidak boleh kosong."); hasError = true; }
+                if (!email) { showError(registerEmailError, "Email tidak boleh kosong."); hasError = true; }
+                else if (!/\S+@\S+\.\S+/.test(email)) { showError(registerEmailError, "Format email tidak valid."); hasError = true; }
+                if (password.length < 6) { showError(registerPasswordError, "Kata sandi minimal 6 karakter."); hasError = true; }
+                if (password !== confirmPassword) { showError(registerConfirmPasswordError, "Konfirmasi kata sandi tidak cocok."); hasError = true; }
+                if (hasError) return;
+                const idMicroResult = validateAndFormatIdMicro(rawMcuId);
+                if (!idMicroResult.valid) { showError(registerMcuIdError, idMicroResult.message); return; }
+                const formattedMcuId = idMicroResult.formattedId;
+                try {
+                    const idMicroExists = await isIdMicroRegistered(formattedMcuId);
+                    if (idMicroExists) { showError(registerMcuIdError, 'ID Mikrokontroler sudah terdaftar.'); return; }
+                    const emailKey = email.replace(/[.#$[\]]/g, '_');
+                    const userRefToCheck = db.ref(`users/${emailKey}`);
+                    const emailSnapshot = await userRefToCheck.get();
+                    if (emailSnapshot.exists()) {
+                        showError(registerEmailError, 'Email sudah terdaftar. Silakan gunakan email lain.');
+                        return;
+                    }
+                    const newUserNodeRef = db.ref(`users/${emailKey}`); 
+                    await newUserNodeRef.set({
+                        namaLengkap: name,
+                        umur: parseInt(age),
+                        idmicro: formattedMcuId,
+                        email: email,
+                        password: password 
+                    });
+                    successMessageDiv.textContent = 'Pendaftaran berhasil! Silakan masuk.';
+                    successMessageDiv.style.display = 'block';
+                    registerForm.reset();
+                    loginTab.click();
+                } catch (error) {
+                    console.error("Terjadi kesalahan saat pendaftaran:", error);
+                    if (!registerMcuIdError.textContent && !registerEmailError.textContent) { 
+                         showError(registerConfirmPasswordError, 'Terjadi kesalahan saat pendaftaran. Silakan coba lagi.');
+                    }
+                }
+            });
+            logoutBtn.addEventListener('click', () => {
+                localStorage.removeItem('isLoggedIn');
+                localStorage.removeItem('userName');
+                localStorage.removeItem('userEmail');
+                localStorage.removeItem('idMicro');
+                authCard.style.display = 'block';
+                userInfoDiv.style.display = 'none';
+                successMessageDiv.style.display = 'none';
+                loginTab.click(); 
+            });
+            forgotPasswordLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert("Fitur 'Lupa Kata Sandi' belum diimplementasikan untuk sistem autentikasi saat ini. \nKarena sistem ini tidak menggunakan Firebase Authentication, reset password perlu logika khusus.");
+            });
+            function displayUserInfo(name, email) {
+                userNameDisplay.textContent = name;
+                userEmailDisplay.textContent = email;
+                authCard.style.display = 'none';
+                userInfoDiv.style.display = 'block';
+                successMessageDiv.style.display = 'none';
+            }
+            function checkLoginState() {
+                if (localStorage.getItem('isLoggedIn') === 'true') {
+                    const storedName = localStorage.getItem('userName');
+                    const storedEmail = localStorage.getItem('userEmail');
+                    if (storedName && storedEmail) {
+                        displayUserInfo(storedName, storedEmail);
+                    } else {
+                        logoutBtn.click();
+                    }
+                } else {
+                    authCard.style.display = 'block';
+                    userInfoDiv.style.display = 'none';
+                }
+            }
+            checkLoginState(); 
+        });
+    </script>
+</body>
+</html>
