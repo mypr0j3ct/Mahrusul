@@ -91,7 +91,6 @@ int transferProgress = 0;
 float temperature = 25.0;
 float GLU, ACD;
 String timestamp1;
-String storedData;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 DFRobot_ESP_PH ph;
 bool wifiWasActiveBeforeMeasurement = false;
@@ -111,7 +110,6 @@ void saveSelectedDataToJson(float GLU, float ACD, int age, float finalAvgPH, int
 float myNeuralNetworkFunction(const Eigen::Vector2f& input, int network_id);
 uint8_t roundUpToUint8(float value);
 float roundToOneDecimal(float value);
-String readFile2(fs::FS &fs, const char *path);
 void createDir(fs::FS &fs, const char *path);
 String getTimestamp();
 void checkAndRestoreWiFi();
@@ -119,6 +117,7 @@ void turnOffWiFiForMeasurement();
 void deleteFile(fs::FS &fs, const char *path);
 void setupFirebase();
 void sendDataToFirebase();
+void printSavedData();
 
 void setup() {
   Serial.begin(115200);
@@ -204,8 +203,7 @@ void loop() {
 
 void turnOffWiFiForMeasurement() {
     timestamp1 = getTimestamp();
-    storedData = readFile2(LittleFS, var2Path);
-    Serial.println(storedData);
+    printSavedData();
     delay(300);
     previousWiFiMode = WiFi.getMode(); 
     if (previousWiFiMode != WIFI_OFF) {
@@ -374,6 +372,7 @@ void showGLUMON() {
   }
   timeClient.begin();
   createDir(LittleFS, "/data");
+  //deleteFile(LittleFS, var2Path);
 }
 
 void showMainMenu() {
@@ -1017,26 +1016,29 @@ float myNeuralNetworkFunction(const Eigen::Vector2f& input, int network_id) {
 //Kode Berkaitan Save DataJSON
 
 void saveSelectedDataToJson(float GLU, float ACD, int age, float finalAvgPH, int deviceIDs, String timestamp11) {
+  DynamicJsonDocument doc(8192);
   File file = LittleFS.open(var2Path, FILE_READ);
-  DynamicJsonDocument doc(2048);
   if (file) {
     DeserializationError error = deserializeJson(doc, file);
-    if (error) {
-      doc["sensor"] = JsonObject();
-    }
     file.close();
+    if (error || !doc["sensor"] || !doc["sensor"].is<JsonArray>()) {
+      doc.clear(); // kosongkan doc agar benar-benar baru
+      doc.createNestedArray("sensor");
+    }
   } else {
-    doc["sensor"] = JsonObject();
+    doc.clear();
+    doc.createNestedArray("sensor");
   }
-  JsonObject sensorData = doc["sensor"].to<JsonObject>();
-  JsonObject data = sensorData.createNestedObject(timestamp11);  
-  data["timestamp"] = timestamp11;                              
+
+  JsonArray sensorArray = doc["sensor"].as<JsonArray>();
+  JsonObject data = sensorArray.createNestedObject();
+  data["timestamp"] = timestamp11;
   data["glucose"] = GLU;
   data["uric_acid"] = ACD;
   data["age"] = age;
   data["avg_ph"] = finalAvgPH;
   data["devicesID"] = deviceIDs;
-  
+
   file = LittleFS.open(var2Path, FILE_WRITE);
   if (!file) {
     Serial.println("Gagal membuka file untuk menulis.");
@@ -1044,7 +1046,7 @@ void saveSelectedDataToJson(float GLU, float ACD, int age, float finalAvgPH, int
   }
   serializeJson(doc, file);
   file.close();
-  Serial.println("Data (GLU, ACD, age, finalAvgPH) berhasil disimpan ke file JSON di LittleFS");
+  Serial.println("Data berhasil DITAMBAHKAN ke file JSON di LittleFS");
 }
 
 String getTimestamp() {
@@ -1065,19 +1067,6 @@ String getTimestamp() {
            ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday,
            ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
   return String(buffer);
-}
-
-String readFile2(fs::FS &fs, const char *path) {
-  File file = fs.open(path, FILE_READ);
-  if (!file) {
-    return String();
-  }
-  String fileContent;
-  while (file.available()) {
-    fileContent += file.readString();
-  }
-  file.close();
-  return fileContent;
 }
 
 void createDir(fs::FS &fs, const char *path) {
@@ -1114,7 +1103,7 @@ void sendDataToFirebase() {
     return;
   }
 
-  DynamicJsonDocument doc(2048);
+  DynamicJsonDocument doc(8192);
   DeserializationError error = deserializeJson(doc, file);
   file.close();
 
@@ -1122,19 +1111,18 @@ void sendDataToFirebase() {
     return;
   }
 
-  JsonObject sensorData = doc["sensor"];
+  JsonArray sensorArray = doc["sensor"].as<JsonArray>();
   bool allDataSent = true;
 
-  for (JsonPair kv : sensorData) {
-    String timestamp = kv.key().c_str();  
-    JsonObject data = kv.value();
+  for (JsonObject data : sensorArray) {
+    String timestamp = data["timestamp"].as<String>();
     FirebaseJson json;
-    json.set(idPath.c_str(), data["devicesID"].as<String>());
-    json.set(gluPath.c_str(), data["glucose"].as<String>());
-    json.set(uridPath.c_str(), data["uric_acid"].as<String>());
-    json.set(pHPath.c_str(), data["avg_ph"].as<String>());
-    json.set(agePath.c_str(), data["age"].as<String>());
-    json.set(timePath.c_str(), data["timestamp"].as<String>()); 
+    json.set(idPath.c_str(), String(data["devicesID"].as<int>()));
+    json.set(gluPath.c_str(), String(data["glucose"].as<float>()));
+    json.set(uridPath.c_str(), String(data["uric_acid"].as<float>()));
+    json.set(pHPath.c_str(), String(data["avg_ph"].as<float>()));
+    json.set(agePath.c_str(), String(data["age"].as<int>()));
+    json.set(timePath.c_str(), timestamp);
 
     String databasePath = "/sensor";
     String parentPath = databasePath + "/" + timestamp;
@@ -1150,4 +1138,17 @@ void sendDataToFirebase() {
     deleteFile(LittleFS, var2Path);
     Serial.print("Data JSON telah dihapus dari memori flash");
   }
+}
+
+void printSavedData() {
+  File file = LittleFS.open(var2Path, FILE_READ);
+  if (!file) {
+    Serial.println("File tidak ditemukan!");
+    return;
+  }
+  while (file.available()) {
+    Serial.write(file.read());
+  }
+  file.close();
+  Serial.println();
 }
