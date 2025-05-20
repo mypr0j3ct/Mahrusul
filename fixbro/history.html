@@ -185,9 +185,6 @@
             .nav-item {
                 font-size: 12px;
             }
-            .hide-on-small {
-                display: none;
-            }
         }
     </style>
 </head>
@@ -208,7 +205,7 @@
                             <th>TANGGAL</th>
                             <th>WAKTU</th>
                             <th>PH</th>
-                            <th class="hide-on-small">ASAM URAT</th> 
+                            <th>ASAM URAT</th>
                             <th>GLUKOSA</th>
                         </tr>
                     </thead>
@@ -302,7 +299,7 @@
                         <td>${dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                         <td>${dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
                         <td>${parseFloat(entry.pH).toFixed(2) || '-'}</td>
-                        <td class="hide-on-small">${parseFloat(entry.urid).toFixed(1) || '-'}</td>
+                        <td>${parseFloat(entry.urid).toFixed(1) || '-'}</td>
                         <td>${parseFloat(entry.glucose).toFixed(0) || '-'}</td>
                     `;
                     historyTableBody.appendChild(row);
