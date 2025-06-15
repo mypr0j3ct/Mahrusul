@@ -21,9 +21,9 @@
         }
         .container {
             min-height: 100vh;
+            padding: 20px;
             padding-bottom: 100px; 
             box-sizing: border-box;
-            padding: 20px;  
             max-width: 100%;
         }
         .header {
@@ -33,21 +33,32 @@
             background-color: white;
             padding: 20px;
             border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 25px;
             flex-wrap: wrap;
             gap: 10px;
             width: 100%; 
         }
         .logo {
-            font-size: 30px;
+            font-size: 28px;
             font-weight: bold;
             color: #0066cc;
         }
         .user-info {
-            font-size: 20px;
-            font-weight: lighter;
+            font-size: 18px;
+            font-weight: normal;
             color: #333;
+        }
+        .device-id {
+            font-size: 14px;
+            color: #666;
+            background-color: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            border: 1px solid #e9ecef;
+            font-weight: 500;
+            display: inline-block;
         }
         .charts-container {
             display: flex;
@@ -60,14 +71,14 @@
             max-width: 600px; 
             min-width: 320px;
             background-color: white;
-            border-radius: 20px;
+            border-radius: 15px;
             padding: 25px; 
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             height: 450px; 
         }
         .chart-title {
             font-size: 22px; 
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             font-weight: bold;
             color: #333;
             text-align: center;
@@ -82,12 +93,13 @@
             display: flex;
             justify-content: space-around;
             background-color: #0066cc;
-            padding: 15px 0;
+            padding: 12px 0;
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             z-index: 999;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
         }
         .nav-item {
             display: flex;
@@ -96,6 +108,12 @@
             color: white;
             text-decoration: none;
             font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: background-color 0.2s ease;
+        }
+        .nav-item.active {
+            background-color: rgba(255, 255, 255, 0.2);
         }
         .nav-icon {
             font-size: 24px;
@@ -106,17 +124,26 @@
                 flex-basis: 100%; 
             }
         }
-        @media (max-width: 600px) {
+        @media (max-width: 768px) {
             .header {
                 flex-direction: column;
                 align-items: flex-start;
             }
-            .user-info {
-                font-size: 18px;
-            }
             .logo {
                 font-size: 24px;
             }
+            .user-info {
+                font-size: 16px;
+            }
+            .device-id {
+                font-size: 12px;
+                margin-left: 6px;
+            }
+            .chart-title {
+                font-size: 20px;
+            }
+        }
+        @media (max-width: 600px) {
             .chart-card {
                 padding: 20px;
                 height: 400px;
@@ -129,6 +156,14 @@
             }
             .nav-item {
                 font-size: 12px;
+            }
+            .user-info {
+                font-size: 14px;
+            }
+            .device-id {
+                font-size: 11px;
+                margin-left: 4px;
+                padding: 2px 6px;
             }
         }
     </style>
@@ -185,12 +220,24 @@
                 return; 
             }
             if (userName) {
-                document.getElementById('userInfoDisplay').textContent = 
-                    `${userName}${userAge ? ` | ${userAge} Thn` : ''}`;
+                // Tambahkan ID micro setelah nama pengguna
+                let userInfoText = userName;
+                if (userAge) {
+                    userInfoText += ` | ${userAge} Thn`;
+                }
+                if (idMicro) {
+                    userInfoText += `<span class="device-id">Device: ${idMicro}</span>`;
+                }
+                document.getElementById('userInfoDisplay').innerHTML = userInfoText;
             } else {
-                document.getElementById('userInfoDisplay').textContent = 'Pengguna';
+                const defaultText = idMicro ? `Pengguna<span class="device-id">Device: ${idMicro}</span>` : 'Pengguna';
+                document.getElementById('userInfoDisplay').innerHTML = defaultText;
             }
             initializeCharts();
+            
+            // Override konfigurasi Chart.js untuk memastikan teks sumbu x tegak
+            Chart.defaults.scales.category.ticks.maxRotation = 0;
+            Chart.defaults.scales.category.ticks.minRotation = 0;
             const sensorRef = db.ref('sensor');
             sensorRef
                 .orderByChild('deviceID') 
@@ -209,9 +256,9 @@
                                 glucoseValues.push(parseFloat(entry.glucose));
                                 uricAcidValues.push(parseFloat(entry.urid));
                                 const date = new Date(entry.timestamp);
-                                const time = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                                // Format tanggal saja tanpa jam (DD/MM format)
                                 const dayMonth = date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' });
-                                labels.push(`${time} ${dayMonth}`);
+                                labels.push(dayMonth);
                             }
                         });
                     }
