@@ -531,7 +531,7 @@ void attemptWiFiConnection() {
     Serial.println(stored_ssid);
     unsigned long startTime = millis();
     int dots = 0;
-    while (WiFi.status() != WL_CONNECTED && (millis() - startTime < 20000)) {
+    while (WiFi.status() != WL_CONNECTED && (millis() - startTime < 10000)) {
       Serial.print(".");
       display.setCursor(0, 24); 
       display.print("                "); 
@@ -612,14 +612,16 @@ void showAgeInputTens() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("Umur (Puluhan)");
+  display.print("Umur: Puluhan");
+
   display.setTextSize(2);
-  display.setCursor(55, 12); 
+  display.setCursor(58, 10); 
   display.print(ageTens);
   display.print("_");
+
   display.setTextSize(1);
-  display.setCursor(0, 24);
-  display.print("Btn1:Ubah, Btn2:Lanjut");
+  display.setCursor(0, 26);
+  display.print("Btn1=Ubah Btn2=Next");
   display.display();
 }
 
@@ -627,14 +629,16 @@ void showAgeInputOnes() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("Umur (Satuan)");
+  display.print("Umur: Satuan");
+
   display.setTextSize(2);
-  display.setCursor(50, 12); 
+  display.setCursor(45, 10); 
   display.print(ageTens);
   display.print(ageOnes);
+
   display.setTextSize(1);
-  display.setCursor(0, 24);
-  display.print("Btn1:Ubah, Btn2:Lanjut");
+  display.setCursor(0, 26);
+  display.print("Btn1=Ubah Btn2=Next");
   display.display();
 }
 
@@ -642,14 +646,16 @@ void showIDInputHundreds() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("ID User (Ratusan)");
+  display.print("ID: Ratusan");
+
   display.setTextSize(2);
-  display.setCursor(45, 12); 
+  display.setCursor(50, 10);
   display.print(idHundreds);
   display.print("__");
+
   display.setTextSize(1);
-  display.setCursor(0, 24);
-  display.print("Btn1:Ubah, Btn2:Lanjut");
+  display.setCursor(0, 26);
+  display.print("Btn1=Ubah Btn2=Next");
   display.display();
 }
 
@@ -657,15 +663,17 @@ void showIDInputTens() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("ID User (Puluhan)");
+  display.print("ID: Puluhan");
+
   display.setTextSize(2);
-  display.setCursor(45, 12);
+  display.setCursor(45, 10);
   display.print(idHundreds);
   display.print(idTens);
   display.print("_");
+
   display.setTextSize(1);
-  display.setCursor(0, 24);
-  display.print("Btn1:Ubah, Btn2:Lanjut");
+  display.setCursor(0, 26);
+  display.print("Btn1=Ubah Btn2=Next");
   display.display();
 }
 
@@ -673,15 +681,17 @@ void showIDInputOnes() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("ID User (Satuan)");
+  display.print("ID: Satuan");
+
   display.setTextSize(2);
-  display.setCursor(45, 12);
+  display.setCursor(45, 10);
   display.print(idHundreds);
   display.print(idTens);
   display.print(idOnes);
+
   display.setTextSize(1);
-  display.setCursor(0, 24);
-  display.print("Tahan Btn1 u/ Mulai");
+  display.setCursor(0, 26);
+  display.print("Tahan Btn1=Mulai");
   display.display();
 }
 
@@ -699,7 +709,7 @@ void startMeasurement() {
   display.setCursor(0, 8);
   display.print("ID:");
   display.print(deviceID);
-  display.print(" U:");
+  display.print(" Usia:");
   display.print(age);
   display.setCursor(0, 16);
   display.println("WiFi: MATI");
@@ -792,7 +802,7 @@ void showResults() {
   
   display.setCursor(0, 0);
   display.print("GLU: ");
-  display.print(GLU);
+  display.print((int)GLU);
   display.setCursor(64, 0);
   display.print("ACD: ");
   display.print(ACD, 1);
