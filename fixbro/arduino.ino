@@ -22,8 +22,8 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32  
 #define OLED_RESET 4
-#define API_KEY "AIzaSyDX9FQQai2rWeUubCX903z-yPMro_TGTIQ"
-#define DATABASE_URL "https://projectv1-a9190-default-rtdb.asia-southeast1.firebasedatabase.app/"
+#define API_KEY "AIzaSyCqFzfUAZbbA0nIB6OHZwsrEbLgMpY37YI"
+#define DATABASE_URL "https://mahrusul-58273-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 enum MenuState {
   MAIN_MENU,
