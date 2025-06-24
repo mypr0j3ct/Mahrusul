@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr
 
-def generate_correlated_data(n_samples=50):  # Changed from 100 to 50
+def generate_correlated_data(n_samples=20):  # Changed from 100 to 50
     """
     Generate dummy data with high correlation based on medical facts:
     - Positive correlation between AGE and GLU (uric acid) 
@@ -76,7 +76,7 @@ while attempt <= max_attempts:
     random.seed(42 + attempt)
     np.random.seed(42 + attempt)
     
-    data = generate_correlated_data(50)  # Generate 50 samples
+    data = generate_correlated_data(20)  # Generate 50 samples GILLA
     age_glu_ok, ph_glu_ok, corr_age_glu, corr_ph_glu = check_correlation_strength(data)
     
     print(f"Korelasi AGE-GLU: {corr_age_glu:.3f} {'✅' if age_glu_ok else '❌'}")
